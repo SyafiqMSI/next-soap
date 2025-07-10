@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: soap_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: soap_db
+      MYSQL_USER: soap_user
+      MYSQL_PASSWORD: soap_password
+      MYSQL_ROOT_HOST: '%'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - soap_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    command: --default-authentication-plugin=mysql_native_password
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: final
+    container_name: soap_app
+    restart: unless-stopped
+    ports:
+      - "30000:30000"
+      - "9720:9720"
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=soap_user
+      - DB_PASSWORD=soap_password
+      - DB_NAME=soap_db
+      - DB_PORT=3306
+      - PORT=9720
+      - NEXT_PUBLIC_SOAP_URL=http://localhost:9720/soap
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - soap_network
+
+volumes:
+  mysql_data:
+
+networks:
+  soap_network:
+    driver: bridge 
